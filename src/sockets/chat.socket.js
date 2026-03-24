@@ -78,6 +78,23 @@ export const setupChatSocket = (io) => {
     }
   })
 
+  const broadcastRoomStats = async (ioInstance, roomId) => {
+    try {
+      const room = await Room.findById(roomId).populate('members', 'isOnline');
+      if (!room) return;
+      const total = room.members.length;
+      const online = room.members.filter(m => m.isOnline).length;
+      ioInstance.to(String(roomId)).emit('room:stats', {
+        roomId: String(roomId),
+        total,
+        online,
+        offline: total - online
+      });
+    } catch (err) {
+      console.error('Failed to broadcast room stats', err);
+    }
+  };
+
   io.on('connection', async (socket) => {
     const userId = String(socket.user._id)
 
@@ -126,6 +143,7 @@ export const setupChatSocket = (io) => {
             email: socket.user.email,
           },
         })
+        await broadcastRoomStats(io, roomId);
       } catch (_error) {
         socket.emit('error:socket', { message: 'Failed to join room' })
       }
@@ -154,6 +172,7 @@ export const setupChatSocket = (io) => {
           roomId,
           userId,
         })
+        await broadcastRoomStats(io, roomId);
       } catch (_error) {
         socket.emit('error:socket', { message: 'Failed to leave room' })
       }
@@ -356,6 +375,11 @@ export const setupChatSocket = (io) => {
         const lastSeen = new Date()
         await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen })
         io.emit('user:status', { userId, isOnline: false, lastSeen })
+
+        const userRooms = await Room.find({ members: userId });
+        for (const r of userRooms) {
+          await broadcastRoomStats(io, r._id);
+        }
       }
     })
   })

@@ -87,16 +87,7 @@ export const joinRoom = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Room not found')
   }
 
-  if (room.isPrivate) {
-    const isAllowed =
-      String(room.createdBy) === userId ||
-      room.invitedUsers.some((id) => String(id) === userId) ||
-      room.members.some((id) => String(id) === userId)
-
-    if (!isAllowed) {
-      throw new ApiError(403, 'Private room is invite-only')
-    }
-  }
+  // Private rooms allow anyone with the exact Room ID to join directly.
 
   const isAlreadyMember = room.members.some((id) => String(id) === userId)
   if (!isAlreadyMember) {
