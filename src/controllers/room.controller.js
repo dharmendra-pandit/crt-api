@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
 import { Room } from '../models/Room.js'
+import { Message } from '../models/Message.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import {
@@ -7,6 +8,7 @@ import {
   isValidObjectId,
   isNonEmptyString,
 } from '../utils/validate.js'
+import { deleteFromCloudinary } from '../utils/cloudinaryUpload.js'
 
 const normalizeIds = (idList = []) => {
   return [...new Set(idList.map((id) => String(id)))].filter((id) =>
@@ -129,3 +131,43 @@ export const leaveRoom = asyncHandler(async (req, res) => {
     message: 'Left room successfully',
   })
 })
+
+export const deleteRoom = asyncHandler(async (req, res) => {
+  const { roomId } = req.params;
+  const userId = String(req.user._id);
+
+  if (!isValidObjectId(roomId)) {
+    throw new ApiError(400, 'Invalid roomId');
+  }
+
+  const room = await Room.findById(roomId);
+  if (!room) {
+    throw new ApiError(404, 'Room not found');
+  }
+
+  if (String(room.createdBy) !== userId) {
+    throw new ApiError(403, 'Only the room creator can delete this room');
+  }
+
+  const messages = await Message.find({ roomId });
+  for (const msg of messages) {
+    if (msg.cloudinaryPublicId) {
+      try {
+        await deleteFromCloudinary(
+          msg.cloudinaryPublicId,
+          msg.cloudinaryResourceType || 'image'
+        );
+      } catch (err) {
+        console.log('Failed to delete asset from Cloudinary:', err);
+      }
+    }
+  }
+
+  await Message.deleteMany({ roomId });
+  await Room.findByIdAndDelete(roomId);
+
+  res.status(200).json({
+    success: true,
+    message: 'Room and its content deleted successfully',
+  });
+});

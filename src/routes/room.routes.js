@@ -4,6 +4,7 @@ import {
   getRooms,
   joinRoom,
   leaveRoom,
+  deleteRoom,
 } from '../controllers/room.controller.js'
 import { authMiddleware } from '../middleware/auth.middleware.js'
 
@@ -13,5 +14,6 @@ router.post('/create', authMiddleware, createRoom)
 router.get('/', authMiddleware, getRooms)
 router.post('/join', authMiddleware, joinRoom)
 router.post('/leave', authMiddleware, leaveRoom)
+router.delete('/:roomId', authMiddleware, deleteRoom)
 
 export default router
