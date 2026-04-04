@@ -162,6 +162,7 @@ export const deleteRoom = asyncHandler(async (req, res) => {
     message: 'Room and its content deleted successfully',
   });
 });
+
 export const joinByCode = asyncHandler(async (req, res) => {
   const code = asTrimmedString(req.body?.code)
   const userId = String(req.user._id)
