@@ -8,6 +8,7 @@ import { env } from './config/env.js'
 import authRoutes from './routes/auth.routes.js'
 import roomRoutes from './routes/room.routes.js'
 import messageRoutes from './routes/message.routes.js'
+import mentorRoutes from './routes/mentor.routes.js'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
 
 export const app = express()
@@ -54,6 +55,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes)
 app.use('/api/rooms', roomRoutes)
 app.use('/api/messages', messageRoutes)
+app.use('/api/mentor', mentorRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)

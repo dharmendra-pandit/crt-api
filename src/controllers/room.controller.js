@@ -162,3 +162,27 @@ export const deleteRoom = asyncHandler(async (req, res) => {
     message: 'Room and its content deleted successfully',
   });
 });
+export const joinByCode = asyncHandler(async (req, res) => {
+  const code = asTrimmedString(req.body?.code)
+  const userId = String(req.user._id)
+
+  if (!code || code.length !== 4) {
+    throw new ApiError(400, 'A valid 4-digit room code is required')
+  }
+
+  const room = await Room.findOne({ code, isPrivate: true })
+  if (!room) {
+    throw new ApiError(404, 'No private room found with that code')
+  }
+
+  const isAlreadyMember = room.members.some((id) => String(id) === userId)
+  if (!isAlreadyMember) {
+    room.members.push(userId)
+    await room.save()
+  }
+
+  res.status(200).json({
+    success: true,
+    room,
+  })
+})

@@ -1,5 +1,7 @@
 import mongoose from 'mongoose'
 
+const generateCode = () => Math.floor(1000 + Math.random() * 9000).toString()
+
 const roomSchema = new mongoose.Schema(
   {
     name: {
@@ -12,6 +14,11 @@ const roomSchema = new mongoose.Schema(
     isPrivate: {
       type: Boolean,
       default: false,
+    },
+    code: {
+      type: String,
+      default: null,
+      sparse: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -38,4 +45,12 @@ const roomSchema = new mongoose.Schema(
 
 roomSchema.index({ name: 1, createdBy: 1 }, { unique: true })
 
+roomSchema.pre('save', function (next) {
+  if (this.isNew && this.isPrivate && !this.code) {
+    this.code = generateCode()
+  }
+  next()
+})
+
 export const Room = mongoose.model('Room', roomSchema)
+export { generateCode }
