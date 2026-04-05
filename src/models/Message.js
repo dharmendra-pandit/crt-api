@@ -13,6 +13,11 @@ const messageSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    expiresAt: {
+      type: Date,
+      default: () => new Date(+new Date() + 24*60*60*1000),
+      index: { expires: '1d' },
+    },
     messageType: {
       type: String,
       enum: ['text', 'image', 'file', 'link', 'sticker'],
