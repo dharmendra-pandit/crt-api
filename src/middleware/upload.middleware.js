@@ -1,7 +1,23 @@
 import multer from 'multer'
 import { ApiError } from '../utils/ApiError.js'
 
-const storage = multer.memoryStorage()
+import fs from 'fs'
+import path from 'path'
+
+const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true })
+}
+
+const storage = multer.diskStorage({
+  destination: function (_req, file, cb) {
+    cb(null, uploadDir)
+  },
+  filename: function (_req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9)
+    cb(null, uniqueSuffix + path.extname(file.originalname))
+  },
+})
 
 const allowedMimePrefixes = [
   'image/',

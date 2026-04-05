@@ -1,12 +1,9 @@
 import mongoose from 'mongoose'
+import fs from 'fs'
 import { Message } from '../models/Message.js'
 import { Room } from '../models/Room.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
-import {
-  deleteFromCloudinary,
-  uploadBufferToCloudinary,
-} from '../utils/cloudinaryUpload.js'
 import {
   asTrimmedString,
   isValidMessageType,
@@ -38,6 +35,7 @@ export const getMessagesByRoom = asyncHandler(async (req, res) => {
 
   const messages = await Message.find({ roomId })
     .populate('sender', '_id username email')
+    .populate('replyTo')
     .sort({ createdAt: 1 })
     .limit(200)
 
@@ -51,12 +49,18 @@ export const uploadFileMessage = asyncHandler(async (req, res) => {
   const roomId = req.body?.roomId
   const messageType = asTrimmedString(req.body?.messageType, 'file')
   const content = asTrimmedString(req.body?.content)
+  const replyTo = req.body?.replyTo || null
 
   if (!isValidObjectId(roomId)) {
     throw new ApiError(
       400,
       'Valid roomId is required in form-data (key: roomId)',
     )
+  }
+
+  // Validate replyTo if provided
+  if (replyTo && !isValidObjectId(replyTo)) {
+    throw new ApiError(400, 'Invalid replyTo message ID')
   }
 
   if (!isValidMessageType(messageType)) {
@@ -73,19 +77,16 @@ export const uploadFileMessage = asyncHandler(async (req, res) => {
 
   await ensureRoomMembership(roomId, req.user._id)
 
-  const uploaded = await uploadBufferToCloudinary(req.file.buffer, {
-    public_id: `${Date.now()}-${req.file.originalname}`,
-    resource_type: 'auto',
-  })
+  const fileUrl = \\://\/uploads/\\
 
   const message = await Message.create({
     roomId,
     sender: req.user._id,
     messageType,
     content,
-    fileUrl: uploaded.secure_url,
-    cloudinaryPublicId: uploaded.public_id || '',
-    cloudinaryResourceType: uploaded.resource_type || 'image',
+    replyTo,
+    fileUrl: fileUrl,
+    localFilePath: req.file.path,
     fileName: req.file.originalname,
     mimeType: req.file.mimetype,
     fileSize: req.file.size,
@@ -93,6 +94,9 @@ export const uploadFileMessage = asyncHandler(async (req, res) => {
   })
 
   await message.populate('sender', '_id username email')
+  if (replyTo) {
+    await message.populate('replyTo')
+  }
 
   res.status(201).json({
     success: true,
@@ -128,11 +132,9 @@ export const deleteMessage = asyncHandler(async (req, res) => {
     )
   }
 
-  if (message.cloudinaryPublicId) {
-    await deleteFromCloudinary(
-      message.cloudinaryPublicId,
-      message.cloudinaryResourceType || 'image',
-    )
+  // Delete local file if it exists
+  if (message.localFilePath && fs.existsSync(message.localFilePath)) {
+    fs.unlinkSync(message.localFilePath)
   }
 
   await message.deleteOne()

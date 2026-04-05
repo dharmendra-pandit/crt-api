@@ -46,6 +46,19 @@ const messageSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    localFilePath: {
+      type: String,
+      default: '',
+    },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    isForwarded: {
+      type: Boolean,
+      default: false,
+    },
     readBy: [
       {
         user: {
