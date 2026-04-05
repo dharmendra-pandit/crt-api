@@ -77,7 +77,8 @@ export const uploadFileMessage = asyncHandler(async (req, res) => {
 
   await ensureRoomMembership(roomId, req.user._id)
 
-  const fileUrl = \\://\/uploads/\\
+  const fileUrl =
+    req.protocol + '://' + req.get('host') + '/uploads/' + req.file.filename
 
   const message = await Message.create({
     roomId,
