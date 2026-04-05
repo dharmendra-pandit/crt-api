@@ -18,6 +18,15 @@ const messageSchema = new mongoose.Schema(
       enum: ['text', 'image', 'file', 'link', 'sticker'],
       required: true,
     },
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message',
+      default: null,
+    },
+    isShared: {
+      type: Boolean,
+      default: false,
+    },
     content: {
       type: String,
       default: '',
@@ -25,6 +34,14 @@ const messageSchema = new mongoose.Schema(
     fileUrl: {
       type: String,
       default: '',
+    },
+    localFilePath: {
+      type: String,
+      default: '',
+    },
+    isDeletedFromServer: {
+      type: Boolean,
+      default: false,
     },
     cloudinaryPublicId: {
       type: String,
@@ -46,19 +63,19 @@ const messageSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    localFilePath: {
-      type: String,
-      default: '',
-    },
-    replyTo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Message',
-      default: null,
-    },
-    isForwarded: {
-      type: Boolean,
-      default: false,
-    },
+    downloadedBy: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        downloadedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     readBy: [
       {
         user: {

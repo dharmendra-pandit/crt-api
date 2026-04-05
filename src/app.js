@@ -25,13 +25,6 @@ app.use(express.json({ limit: '2mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser())
 
-// Serve static files from public directory (for local file sharing)
-import path from 'path'
-app.use(
-  '/uploads',
-  express.static(path.join(process.cwd(), 'public', 'uploads')),
-)
-
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,

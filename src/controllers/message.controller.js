@@ -77,22 +77,21 @@ export const uploadFileMessage = asyncHandler(async (req, res) => {
 
   await ensureRoomMembership(roomId, req.user._id)
 
-  const fileUrl =
-    req.protocol + '://' + req.get('host') + '/uploads/' + req.file.filename
-
   const message = await Message.create({
     roomId,
     sender: req.user._id,
     messageType,
     content,
     replyTo,
-    fileUrl: fileUrl,
     localFilePath: req.file.path,
     fileName: req.file.originalname,
     mimeType: req.file.mimetype,
     fileSize: req.file.size,
     readBy: [{ user: req.user._id }],
   })
+
+  message.fileUrl = `${req.protocol}://${req.get('host')}/api/messages/download/${message._id}`
+  await message.save()
 
   await message.populate('sender', '_id username email')
   if (replyTo) {
@@ -144,5 +143,94 @@ export const deleteMessage = asyncHandler(async (req, res) => {
     success: true,
     message: 'Message deleted successfully',
     deletedMessageId: messageId,
+  })
+})
+
+export const downloadFile = asyncHandler(async (req, res) => {
+  const { messageId } = req.params
+
+  if (!isValidObjectId(messageId)) {
+    throw new ApiError(400, 'Invalid messageId')
+  }
+
+  const message = await Message.findById(messageId)
+  if (!message) {
+    throw new ApiError(404, 'Message not found')
+  }
+
+  await ensureRoomMembership(message.roomId, req.user._id)
+
+  if (message.isDeletedFromServer || !message.localFilePath) {
+    throw new ApiError(410, 'File has already been removed from the server.')
+  }
+
+  const filePath = message.localFilePath
+  if (!fs.existsSync(filePath)) {
+    throw new ApiError(404, 'File missing from server')
+  }
+
+  const hasDownloaded = message.downloadedBy.some(
+    (d) => String(d.user) === String(req.user._id)
+  )
+
+  res.download(filePath, message.fileName, async (err) => {
+    if (err) {
+      console.error('Error downloading file:', err)
+      return
+    }
+
+    if (String(message.sender) !== String(req.user._id)) {
+      if (!hasDownloaded) {
+        message.downloadedBy.push({ user: req.user._id })
+      }
+      
+      message.isDeletedFromServer = true
+      await message.save()
+
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath)
+        }
+      } catch (err) {
+        console.error('Could not delete file', err)
+      }
+    }
+  })
+})
+
+export const shareMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params
+  const { targetRoomId } = req.body
+
+  if (!isValidObjectId(messageId) || !isValidObjectId(targetRoomId)) {
+    throw new ApiError(400, 'Invalid messageId or targetRoomId')
+  }
+
+  const originalMessage = await Message.findById(messageId)
+  if (!originalMessage) {
+    throw new ApiError(404, 'Message not found')
+  }
+
+  await ensureRoomMembership(originalMessage.roomId, req.user._id)
+  await ensureRoomMembership(targetRoomId, req.user._id)
+
+  const newMessage = await Message.create({
+    roomId: targetRoomId,
+    sender: req.user._id,
+    messageType: originalMessage.messageType,
+    content: originalMessage.content,
+    isShared: true,
+    fileUrl: originalMessage.fileUrl,
+    fileName: originalMessage.fileName,
+    mimeType: originalMessage.mimeType,
+    fileSize: originalMessage.fileSize,
+    readBy: [{ user: req.user._id }],
+  })
+
+  await newMessage.populate('sender', '_id username email')
+
+  res.status(201).json({
+    success: true,
+    message: newMessage,
   })
 })
