@@ -9,6 +9,8 @@ import {
   isNonEmptyString,
 } from '../utils/validate.js'
 import { deleteFromCloudinary } from '../utils/cloudinaryUpload.js'
+import { Notification } from '../models/Notification.js'
+import { User } from '../models/User.js'
 
 const normalizeIds = (idList = []) => {
   return [...new Set(idList.map((id) => String(id)))].filter((id) =>
@@ -187,3 +189,52 @@ export const joinByCode = asyncHandler(async (req, res) => {
     room,
   })
 })
+
+export const inviteUserToRoom = asyncHandler(async (req, res) => {
+  const { roomId } = req.params;
+  const { targetUserId } = req.body;
+  const senderId = String(req.user._id);
+
+  if (!isValidObjectId(roomId) || !isValidObjectId(targetUserId)) {
+    throw new ApiError(400, 'Invalid room ID or target user ID');
+  }
+
+  const room = await Room.findById(roomId);
+  if (!room) throw new ApiError(404, 'Room not found');
+
+  const senderIsMember = room.members.some(id => String(id) === senderId) || String(room.createdBy) === senderId;
+  if (!senderIsMember && room.isPrivate) {
+    throw new ApiError(403, 'You do not have permission to invite users to this room');
+  }
+
+  // Ensure target is not already a member
+  const targetIsMember = room.members.some(id => String(id) === targetUserId);
+  if (targetIsMember) {
+    return res.status(400).json({ success: false, message: 'User is already a member of this room' });
+  }
+
+  // Push to invitedUsers if not there
+  const alreadyInvited = room.invitedUsers.some(id => String(id) === targetUserId);
+  if (!alreadyInvited) {
+    room.invitedUsers.push(targetUserId);
+    await room.save();
+  }
+
+  // Send Notification
+  const sender = await User.findById(senderId);
+  const senderName = sender?.profileData?.name || sender?.username || 'Someone';
+
+  await Notification.create({
+    userId: targetUserId,
+    type: 'discussion',
+    title: 'Room Invite',
+    message: `${senderName} invited you to join the room "${room.name}".${room.code ? ` Use code to join: ${room.code}` : ''}`,
+    link: `/room-chat/${room._id}`,
+    relatedId: roomId
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'User invited successfully'
+  });
+});
