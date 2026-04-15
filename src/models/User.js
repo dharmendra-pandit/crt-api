@@ -43,6 +43,8 @@ const userSchema = new mongoose.Schema(
       hubInfo: { type: Object, default: {} },
       academyProgress: { type: Object, default: {} },
     },
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
